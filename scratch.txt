@@ -1,0 +1,23 @@
+--- Hasbi nAllah hu wa naimal wakeel
+create a customer class, and a stack of seats. customers remove seats and put them back in a concurrent fashion.
+seat. has a position. x,y. and price.
+cutomer has a name, and can request seats. and return seats.
+
+write sync demo. create package for exercise.
+
+
+
+
+- the number of seatsavailable should be synchronized. changing this number i mean.
+
+
+
+
+
+
+
+
+
+
+hashmap by rank of seat. neighbors.
+reserved seats go into a hashmap of customers.
