@@ -1,33 +1,24 @@
 package demos;
 
 class Counter {
-    static int count;
+    static int count = 20000;
 
-    public static void increment() {
-        count++;//count = count+1;
+//    public static void decrement() {
+//        count--;//count = count-1;
+//    }
+
+    public synchronized static void decrement() {
+        count--;//count = count-1;
     }
+
 }
 
-//class CounterNonStatic {
-//    int count;
-//
-//    public void increment() {
-//        count++;//count = count+1;
-//    }
-//}
-
 class TunaCustomer implements Runnable {
-//    CounterNonStatic c;
-//
-//    public TunaCustomer(CounterNonStatic cns){
-//        c = cns;
-//    }
 
     public void run() {
         try {
-            for (int i = 0; i < 10000; i++) {
-                Counter.increment();
-//                c.increment();
+            for (int i = 10000; i > 0; i--) {
+                Counter.decrement();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -38,14 +29,8 @@ class TunaCustomer implements Runnable {
 public class SyncDemo {
 
     public static void main(String[] args) {
-//        CounterNonStatic cns = new CounterNonStatic();
-
-        //create threads
-//        Thread t1 = new Thread(new TunaCustomer(cns), "bobby");
-//        Thread t2 = new Thread(new TunaCustomer(cns), "joe");
         Thread t1 = new Thread(new TunaCustomer(), "bobby");
         Thread t2 = new Thread(new TunaCustomer(), "joe");
-
 
         //start them
         t1.start();
@@ -61,7 +46,6 @@ public class SyncDemo {
 
         //show count
         System.out.println("final count: " + Counter.count);
-//        System.out.println("final count (cns): " + cns.count);
     }
 
 }
