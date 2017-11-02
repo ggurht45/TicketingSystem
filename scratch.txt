@@ -38,9 +38,13 @@ reserved seats go into a hashmap of customers.
 
 PRIORITY QUEUE WAITLIST--------------------------------------------------------------
 java.util.concurrent.ConcurrentLinkedQueue (JDK1.5, 1.6)
-java.util.concurrent.LinkedTransferQueue (JDK1.7).
 Both these Classes
 Use fast atomic (java.util.concurrent.atomic package) methods for Add, Poll and Peek.
 Use linked nodes that the queue re-links after polling thereby averting all reordering. Simple and fast.
 
-do the neigborsh last. they are tricky. cuz the rank/score changes dynamically.
+do the neigborsh last. they are tricky. cuz the rank/score changes dynamically. (only consider neighbors in your own rank bucket. only look out of the bucket if no more elements in the bucket.
+
+atomicinteger incrementAndGet. 40:37 Combining concurrency and collections.
+
+
+
