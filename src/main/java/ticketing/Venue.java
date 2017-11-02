@@ -2,9 +2,9 @@ package ticketing;
 
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.*;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 
 
 public class Venue implements TicketService {
@@ -16,6 +16,13 @@ public class Venue implements TicketService {
     private static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<String>> mapOfWaitLists = new ConcurrentHashMap<>();
     //keys = customer name; value is seat they reserved.
     private static ConcurrentHashMap<String, String> mapOfReservedSeats = new ConcurrentHashMap<>();
+
+    //thread factory naming
+    private static ThreadFactory threadFactory = new ThreadFactoryBuilder()
+            .setNameFormat("Customer-%d")
+            .setDaemon(true)
+            .build();
+
 
 
     private static String holdSeat() {
@@ -71,16 +78,16 @@ public class Venue implements TicketService {
         ConcurrentLinkedQueue<String> waitList_5 = new ConcurrentLinkedQueue<>();
         waitList_5.add("seat1");
         waitList_5.add("seat2");
-//        waitList_5.add("seat3");
-//        waitList_5.add("seat4");
-//        waitList_5.add("seat5");
+        waitList_5.add("seat3");
+        waitList_5.add("seat4");
+        waitList_5.add("seat5");
 
         ConcurrentLinkedQueue<String> waitList_10 = new ConcurrentLinkedQueue<>();
         waitList_10.add("seat6");
         waitList_10.add("seat7");
-//        waitList_10.add("seat8");
-//        waitList_10.add("seat9");
-//        waitList_10.add("seat10");
+        waitList_10.add("seat8");
+        waitList_10.add("seat9");
+        waitList_10.add("seat10");
 
         //put waitlists in hashmap
         mapOfWaitLists.put(5, waitList_5);
@@ -90,20 +97,29 @@ public class Venue implements TicketService {
 
         //create several threads that remove highest priority seat and put them back after a few seconds.
         //create threads; with lambda functions.
-        Thread t1 = new Thread(() -> Venue.imitateCustomer(), "bobby");
-        Thread t2 = new Thread(() -> Venue.imitateCustomer(), "joe");
-
-        //start them
-        t1.start();
-        t2.start();
-
-        //wait for them to finish and then join them to the main thread
-        try {
-            t1.join();
-            t2.join();
-        } catch (Exception e) {
-            e.printStackTrace();
+//        Thread t1 = new Thread(() -> Venue.imitateCustomer(), "bobby");
+//        Thread t2 = new Thread(() -> Venue.imitateCustomer(), "joe");
+//
+//        //start them
+//        t1.start();
+//        t2.start();
+//
+//        //wait for them to finish and then join them to the main thread
+//        try {
+//            t1.join();
+//            t2.join();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+        ExecutorService executor = Executors.newFixedThreadPool(5, threadFactory);//creating a pool of 5 threads
+        for (int i = 0; i < 10; i++) {
+//            Runnable worker = new WorkerThread("" + i);
+            executor.execute(() -> Venue.imitateCustomer());//calling execute method of ExecutorService
         }
+        executor.shutdown();
+        while (!executor.isTerminated()) {   }
+
+
 
         //show map after both threads finish
         System.out.println("*** Map at the end\n" + mapOfWaitLists + "\n***");
