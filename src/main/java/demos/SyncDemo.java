@@ -1,5 +1,7 @@
 package demos;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 class Counter {
     static int count = 20000;
 
@@ -19,23 +21,24 @@ public class SyncDemo {
     }
 
     public static void main(String[] args) {
-        //create threads; with lambda functions.
-        Thread t1 = new Thread(() -> SyncDemo.decrementCounter(), "bobby");
-        Thread t2 = new Thread(() -> SyncDemo.decrementCounter(), "joe");
 
-        //start them
-        t1.start();
-        t2.start();
-
-        //wait for them to finish and then join them to the main thread
-        try {
-            t1.join();
-            t2.join();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        //show count
-        System.out.println("final count: " + Counter.count);
+//        //create threads; with lambda functions.
+//        Thread t1 = new Thread(() -> SyncDemo.decrementCounter(), "bobby");
+//        Thread t2 = new Thread(() -> SyncDemo.decrementCounter(), "joe");
+//
+//        //start them
+//        t1.start();
+//        t2.start();
+//
+//        //wait for them to finish and then join them to the main thread
+//        try {
+//            t1.join();
+//            t2.join();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//
+//        //show count
+//        System.out.println("final count: " + Counter.count);
     }
 }
