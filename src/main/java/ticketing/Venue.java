@@ -73,8 +73,9 @@ public class Venue implements TicketService {
                 return seatHold;
             }
         }
-        printStatement3(customerEmail);
-        SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, (numSeats - numSeatsToHold));
+        int numberOfSeatsFound = numSeats - numSeatsToHold;
+        SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, numberOfSeatsFound);
+        printStatement1(seatHold, customerEmail, "customer only found " + numberOfSeatsFound + " out of " + numSeats);
         return seatHold; // no seats found
     }
 
@@ -186,13 +187,19 @@ public class Venue implements TicketService {
 
         //create several threads that remove highest priority seat and put them back after a few seconds.
         ExecutorService executor = Executors.newFixedThreadPool(5, threadFactory);//creating a pool of 5 threads
-        for (int i = 0; i < 4; i++) {
+        while (true) {
             //execute method takes in a runnable object
             executor.execute(() -> Venue.imitateCustomer());
+            if (venueInstance.numSeatsAvailable() == 0 && NUM_OF_SEATS_HELD.get() == 0) {
+                System.out.println("sa: " + venueInstance.numSeatsAvailable() + "sh: " + NUM_OF_SEATS_HELD.get());
+                executor.shutdown();
+                break;
+            }
+
         }
-        executor.shutdown();
-        while (!executor.isTerminated()) {
-        }
+
+//        while (!executor.isTerminated()) {
+//        }
 
 
         //final print
