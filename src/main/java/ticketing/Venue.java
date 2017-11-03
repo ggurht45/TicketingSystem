@@ -48,16 +48,7 @@ public class Venue implements TicketService {
         //keep the original number in arg. decrement this variable
         int numSeatsToHold = numSeats;
 
-        Seat seat = null; // return value
-//        do {
-//            //if all of the seats (that are not reserved already) are being held, then wait.
-//            while (NUM_OF_SEATS_HELD.get() < (TOTAL_NUM_OF_SEATS.get() - NUM_OF_SEATS_RESERVED.get())) {
-////                try {
-////                    Thread.currentThread().wait();
-////                } catch (Exception e) {
-////                    e.printStackTrace();
-////                }
-//            }
+        Seat seat = null;
         for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfWaitLists.entrySet()) {  // look in each wait list for the first used
             //get key, value for each entry
             Integer key = entry.getKey();
@@ -82,11 +73,6 @@ public class Venue implements TicketService {
                 return seatHold;
             }
         }
-//        } while (NUM_OF_SEATS_RESERVED != TOTAL_NUM_OF_SEATS);
-        //dont give up if total number of seats != reserved seats.
-        //wait until[#held < #rest]          (total - reserved) ==> rest of seats.
-        //dont give up if seats are being held currently.
-
         printStatement3(customerEmail);
         SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, (numSeats - numSeatsToHold));
         return seatHold; // no seats found
@@ -116,7 +102,7 @@ public class Venue implements TicketService {
     //this will be executed inside the run method of the threads that will be imitating customers using this service
     private static void imitateCustomer() {
         //request for and hold a random number of seats, each customer.
-        int numSeatsToHold = 3;//ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
+        int numSeatsToHold = ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
         String customerEmail = Thread.currentThread().getName();
 
 
@@ -126,7 +112,7 @@ public class Venue implements TicketService {
 
         //then go to sleep for a few seconds. (to imitate customer contemplating seat choices)
         try {
-            int timeSecs = 1000;//ThreadLocalRandom.current().nextInt(EXPIRE_MIN, EXPIRE_MAX + 1);
+            int timeSecs = ThreadLocalRandom.current().nextInt(EXPIRE_MIN, EXPIRE_MAX + 1);
             System.out.println(customerEmail + " thread sleeping for " + (timeSecs / 1000) + "\n");
             Thread.sleep(timeSecs);
         } catch (Exception e) {
@@ -134,7 +120,7 @@ public class Venue implements TicketService {
         }
 
         //after wakes up, should decide if to return the seat or reserve it.
-        int reserveOrNot = 0;//ThreadLocalRandom.current().nextInt(0, 2);
+        int reserveOrNot = ThreadLocalRandom.current().nextInt(0, 2);
         if (reserveOrNot == 0) {
             Venue.expireHold(seatHold.getSeatsBeingHeld());
             printStatement1(seatHold, customerEmail, "Seats Hold Expired");
@@ -158,7 +144,9 @@ public class Venue implements TicketService {
         int hash = seatHold.getSeatsBeingHeld().hashCode();
         seatHold.setHashId(hash);
         mapOfReservedSeats.put(hash, seatHold);
-        NUM_OF_SEATS_RESERVED.addAndGet(seatHold.getNumberOfSeats());
+        int num = seatHold.getNumberOfSeats();
+        NUM_OF_SEATS_HELD.addAndGet(-num);  //remove from the held seats counter
+        NUM_OF_SEATS_RESERVED.addAndGet(num); //add to the reserved seats counter
         return hash;
     }
 
@@ -171,19 +159,19 @@ public class Venue implements TicketService {
         ConcurrentLinkedQueue<Seat> waitList_5 = new ConcurrentLinkedQueue<>();
         waitList_5.add(new Seat(0, 0, 5));
         waitList_5.add(new Seat(0, 1, 5));
-//        waitList_5.add(new Seat(0, 2, 5));
-//        waitList_5.add(new Seat(0, 3, 5));
-//        waitList_5.add(new Seat(0, 4, 5));
+        waitList_5.add(new Seat(0, 2, 5));
+        waitList_5.add(new Seat(0, 3, 5));
+        waitList_5.add(new Seat(0, 4, 5));
 
         ConcurrentLinkedQueue<Seat> waitList_10 = new ConcurrentLinkedQueue<>();
         waitList_10.add(new Seat(1, 0, 10));
         waitList_10.add(new Seat(1, 1, 10));
-//        waitList_10.add(new Seat(1, 2, 10));
-//        waitList_10.add(new Seat(1, 3, 10));
-//        waitList_10.add(new Seat(1, 4, 10));
+        waitList_10.add(new Seat(1, 2, 10));
+        waitList_10.add(new Seat(1, 3, 10));
+        waitList_10.add(new Seat(1, 4, 10));
 
         //set total num seats;
-        TOTAL_NUM_OF_SEATS.getAndSet(4);
+        TOTAL_NUM_OF_SEATS.getAndSet(10);
 
 
         //put waitlists in hashmap
