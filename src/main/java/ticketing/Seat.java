@@ -31,6 +31,6 @@ public class Seat {
 
     @Override
     public String toString() {
-        return "St(" + xPosition + "," + yPosition + ")-" + priority;
+        return "(" + xPosition + "," + yPosition + ")-" + priority;
     }
 }

@@ -10,6 +10,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class Venue implements TicketService {
 
+    //instance of class
+    private static Venue venueInstance;
+
     //sleeping times in miliseconds
     private static final int EXPIRE_MIN = 1000;
     private static final int EXPIRE_MAX = 3000;
@@ -27,11 +30,10 @@ public class Venue implements TicketService {
     //counter for currently reserved seats
     private static AtomicInteger NUM_OF_SEATS_RESERVED = new AtomicInteger();
 
-
     //see 1.
     private static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Seat>> mapOfWaitLists = new ConcurrentHashMap<>();
     //keys = customer name/email; value is seat they reserved. (later will be seatHold object)
-    private static ConcurrentHashMap<String, Seat> mapOfReservedSeats = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<Integer, SeatHold> mapOfReservedSeats = new ConcurrentHashMap<>();
 
     //thread factory naming
     private static ThreadFactory threadFactory = new ThreadFactoryBuilder()
@@ -39,26 +41,12 @@ public class Venue implements TicketService {
             .setDaemon(true)
             .build();
 
-    //think about numSeatsToHold, and synchronization, and multi threads.
-    //just polling, maybe dont need to worry about sync. hm.. think later.
-    //********this method collects all the seats in one go for one customer and then returns them.****
-    //maybe could think of a method that satisfies many customers one seat at a time.
-    // the customer could dynamically increase or decrease their seat requests.
-
-    //********> before a thread gives up waiting to hold onto some elements, it should wait until no seats are being held.
-    //in other words, if seats are being held currently, then the thread should not give up and say oh, no seats are available.
-    //see producer consumer exmple.
-
-    //----> customers = threads. customers who are currently holding seats are possible producers.
-    //customers who are waiting to hold seats are possible consumers. ... hmm. maybe use BlockingQueue. sizes will be determined by initial read of data.
-
-
-    //---> reason to not use blockingQ.
-    //well we have more than one list. therefore, if one list is empty and it may really be empty, so we dont want to continuously wait on it.
-    //
-
-    private synchronized static ConcurrentLinkedQueue<Seat> holdSeats(int numSeatsToHold, String customerEmail) {
+    //see 2.
+    private synchronized static SeatHold holdSeats(int numSeats, String customerEmail) {
         ConcurrentLinkedQueue<Seat> seatsBeingHeld = new ConcurrentLinkedQueue<>();
+
+        //keep the original number in arg. decrement this variable
+        int numSeatsToHold = numSeats;
 
         Seat seat = null; // return value
 //        do {
@@ -70,123 +58,147 @@ public class Venue implements TicketService {
 ////                    e.printStackTrace();
 ////                }
 //            }
-            for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfWaitLists.entrySet()) {  // look in each wait list for the first used
-                //get key, value for each entry
-                Integer key = entry.getKey();
-                ConcurrentLinkedQueue<Seat> waitingListValue = entry.getValue();
+        for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfWaitLists.entrySet()) {  // look in each wait list for the first used
+            //get key, value for each entry
+            Integer key = entry.getKey();
+            ConcurrentLinkedQueue<Seat> waitingListValue = entry.getValue();
 
-                //get top seat; if possible
-                seat = waitingListValue.poll();
+            //peek top seat
+            seat = waitingListValue.peek();
 
-                //while current list is not empty, and still need more seats
-                //then, collect the seat that was polled, and update counter and seat variable
-                while (seat != null && numSeatsToHold > 0) {
-                    seatsBeingHeld.add(seat);
-                    numSeatsToHold--;
-                    NUM_OF_SEATS_HELD.incrementAndGet();
-                    seat = waitingListValue.poll(); //update seat variable
-                }
-
-                //if all the seats have been collected, then return them.
-                if (numSeatsToHold == 0) {
-                    return seatsBeingHeld;
-                }
+            //while current list is not empty, and still need more seats
+            //then, collect the seat that was polled, and update counter and seat variable
+            while (seat != null && numSeatsToHold > 0) {
+                seat = waitingListValue.poll(); //pop seat
+                seatsBeingHeld.add(seat);
+                numSeatsToHold--;
+                NUM_OF_SEATS_HELD.incrementAndGet();
+                seat = waitingListValue.peek(); //peek next seat
             }
+
+            //if all the seats have been collected, then return them.
+            if (numSeatsToHold == 0) {
+                SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, numSeats);
+                return seatHold;
+            }
+        }
 //        } while (NUM_OF_SEATS_RESERVED != TOTAL_NUM_OF_SEATS);
         //dont give up if total number of seats != reserved seats.
         //wait until[#held < #rest]          (total - reserved) ==> rest of seats.
         //dont give up if seats are being held currently.
 
-
-        System.out.println("!!!! empty q of seats being returned... !!!"); //<------ IF we see this message, (even once), then the final
-        //map after everything needs to be empty. (i think).
-        return seatsBeingHeld; // no seats found
+        printStatement3(customerEmail);
+        SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, (numSeats - numSeatsToHold));
+        return seatHold; // no seats found
     }
+
+
+    private synchronized static void printStatement1(SeatHold sh, String email, String msg) {
+        System.out.println("-----------" + email + "----" + msg);
+        System.out.println(sh);
+        printStatement2_staticVars();
+        System.out.println("End-----------" + email + "\n");
+    }
+
+    private synchronized static void printStatement2_staticVars() {
+        System.out.println(mapOfWaitLists);
+        System.out.println(mapOfReservedSeats);
+        System.out.println("NUM_OF_SEATS_HELD: " + NUM_OF_SEATS_HELD.get());
+        System.out.println("NUM_OF_SEATS_RESERVED: " + NUM_OF_SEATS_RESERVED.get());
+        System.out.println("venueInstance.numSeatsAvailable(): " + venueInstance.numSeatsAvailable());
+    }
+
+    private static void printStatement3(String threadName) {
+        System.out.println("-----------" + threadName + "----seat queues seem empty..\n");
+    }
+
 
     //this will be executed inside the run method of the threads that will be imitating customers using this service
     private static void imitateCustomer() {
         //request for and hold a random number of seats, each customer.
-        int numSeatsToHold = 6;//ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
-
-        //find seats based on neighbors later. for now select single best seats.
+        int numSeatsToHold = 3;//ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
+        String customerEmail = Thread.currentThread().getName();
 
 
         //each thread is like a person. should hold a seat
-        ConcurrentLinkedQueue<Seat> seats = Venue.holdSeats(numSeatsToHold, Thread.currentThread().getName());
-        System.out.println(Thread.currentThread().getName() + " got hold of seat: " + seats);
-        String msg = "Map after " + seats + " held by " + Thread.currentThread().getName() + "\n";
-        System.out.println("***" + msg + mapOfWaitLists + "\n***");
+        SeatHold seatHold = venueInstance.findAndHoldSeats(numSeatsToHold, customerEmail);
+        printStatement1(seatHold, customerEmail, "Seats Held");
 
         //then go to sleep for a few seconds. (to imitate customer contemplating seat choices)
         try {
             int timeSecs = 1000;//ThreadLocalRandom.current().nextInt(EXPIRE_MIN, EXPIRE_MAX + 1);
-            System.out.println(Thread.currentThread().getName() + " about to sleep for(secs): " + (timeSecs / 1000.0));
+            System.out.println(customerEmail + " thread sleeping for " + (timeSecs / 1000) + "\n");
             Thread.sleep(timeSecs);
         } catch (Exception e) {
-            System.out.println(Thread.currentThread().getName() + " exception happened! ");
             e.printStackTrace();
         }
 
         //after wakes up, should decide if to return the seat or reserve it.
         int reserveOrNot = 0;//ThreadLocalRandom.current().nextInt(0, 2);
-        //seats might be null if couldnt find any seats.
         if (reserveOrNot == 0) {
-            //put back
-            Venue.expireHold(seats);
-            System.out.println("please put this seat back into its queue: " + seats);
-
+            Venue.expireHold(seatHold.getSeatsBeingHeld());
+            printStatement1(seatHold, customerEmail, "Seats Hold Expired");
         } else {
-            //reserve
-            Venue.reserve(seats);
-            System.out.println("please reserve this seat: " + seats);
+            int seatHoldId = Venue.saveToReservationMap(seatHold);
+            venueInstance.reserveSeats(seatHoldId, seatHold.getCustomerEmail());
+            printStatement1(seatHold, customerEmail, "Seats Hold Reserved");
         }
-
-
     }
 
     //i dont think synchronized is needed here,.. now with queue rather than single seat, maybe we do.
     //still dont think we need sync, cuz just adding to the q. multiple threads can do that to the unbounded q.
     private synchronized static void expireHold(ConcurrentLinkedQueue<Seat> seats) {
         for (Seat seat : seats) {
-            System.out.println(seat + " is being put back...(priority:" + seat.getPriority() + ")");
             NUM_OF_SEATS_HELD.decrementAndGet();
             mapOfWaitLists.get(seat.getPriority()).add(seat);
-//            Thread.currentThread().notifyAll();
         }
-
     }
 
-    private static void reserve(ConcurrentLinkedQueue<Seat> seats) {
-        System.out.println(seats + " is being reserved...");
+    private static int saveToReservationMap(SeatHold seatHold) {
+        int hash = seatHold.getSeatsBeingHeld().hashCode();
+        seatHold.setHashId(hash);
+        mapOfReservedSeats.put(hash, seatHold);
+        NUM_OF_SEATS_RESERVED.addAndGet(seatHold.getNumberOfSeats());
+        return hash;
     }
 
 
     public static void main(String[] args) {
+        //create an instance of this class to be used in other places
+        venueInstance = new Venue();
+
         //create a 2 waitlists. give them 5 seats each. each seat has priority. 5, 10. five is higher priority.
         ConcurrentLinkedQueue<Seat> waitList_5 = new ConcurrentLinkedQueue<>();
         waitList_5.add(new Seat(0, 0, 5));
         waitList_5.add(new Seat(0, 1, 5));
-        waitList_5.add(new Seat(0, 2, 5));
-        waitList_5.add(new Seat(0, 3, 5));
-        waitList_5.add(new Seat(0, 4, 5));
+//        waitList_5.add(new Seat(0, 2, 5));
+//        waitList_5.add(new Seat(0, 3, 5));
+//        waitList_5.add(new Seat(0, 4, 5));
 
         ConcurrentLinkedQueue<Seat> waitList_10 = new ConcurrentLinkedQueue<>();
         waitList_10.add(new Seat(1, 0, 10));
         waitList_10.add(new Seat(1, 1, 10));
-        waitList_10.add(new Seat(1, 2, 10));
-        waitList_10.add(new Seat(1, 3, 10));
-        waitList_10.add(new Seat(1, 4, 10));
+//        waitList_10.add(new Seat(1, 2, 10));
+//        waitList_10.add(new Seat(1, 3, 10));
+//        waitList_10.add(new Seat(1, 4, 10));
+
+        //set total num seats;
+        TOTAL_NUM_OF_SEATS.getAndSet(4);
 
 
         //put waitlists in hashmap
         mapOfWaitLists.put(5, waitList_5);
         mapOfWaitLists.put(10, waitList_10);
-        System.out.println("*** Initial map\n" + mapOfWaitLists + "\n***");
+
+        //initial print
+        System.out.println("--------------initial vars:");
+        printStatement2_staticVars();
+        System.out.println("----------------------------\n");
 
 
         //create several threads that remove highest priority seat and put them back after a few seconds.
         ExecutorService executor = Executors.newFixedThreadPool(5, threadFactory);//creating a pool of 5 threads
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 4; i++) {
             //execute method takes in a runnable object
             executor.execute(() -> Venue.imitateCustomer());
         }
@@ -195,22 +207,25 @@ public class Venue implements TicketService {
         }
 
 
-        //show map after both threads finish
-        System.out.println("*** Map at the end\n" + mapOfWaitLists + "\n***");
+        //final print
+        System.out.println("\n--------------final vars:");
+        printStatement2_staticVars();
     }
 
     public int numSeatsAvailable() {
-        return 0;
+        return TOTAL_NUM_OF_SEATS.get() - (NUM_OF_SEATS_HELD.get() + NUM_OF_SEATS_RESERVED.get());
     }
 
     public SeatHold findAndHoldSeats(int numSeats, String customerEmail) {
-        return new SeatHold();
+        return Venue.holdSeats(numSeats, customerEmail);
     }
 
     public String reserveSeats(int seatHoldId, String customerEmail) {
-        return "seats not reserved";
+        //seats should already have been stored in the reservation map, thats why we have seatHoldID,
+        //perform any other business logic here
+        String i = (new Integer(seatHoldId)).toString();
+        return (i).concat(customerEmail.substring(0, 3));
     }
-
 
 }
 
@@ -225,3 +240,23 @@ public class Venue implements TicketService {
 // the hashmap.
 //
 //can use the default constructor for the ConcurrentHashMap, which sets the initial capacity of the hashmap to be 16, and load fac .75, concur 16
+
+
+//2. think about numSeatsToHold, and synchronization, and multi threads.
+//just polling, maybe dont need to worry about sync. hm.. think later.
+//********this method collects all the seats in one go for one customer and then returns them.****
+//maybe could think of a method that satisfies many customers one seat at a time.
+// the customer could dynamically increase or decrease their seat requests.
+
+//********> before a thread gives up waiting to hold onto some elements, it should wait until no seats are being held.
+//in other words, if seats are being held currently, then the thread should not give up and say oh, no seats are available.
+//see producer consumer exmple.
+
+//----> customers = threads. customers who are currently holding seats are possible producers.
+//customers who are waiting to hold seats are possible consumers. ... hmm. maybe use BlockingQueue. sizes will be determined by initial read of data.
+
+
+//---> reason to not use blockingQ.
+//well we have more than one list. therefore, if one list is empty and it may really be empty, so we dont want to continuously wait on it.
+//
+
