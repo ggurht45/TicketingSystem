@@ -108,7 +108,7 @@ public class Venue implements TicketService {
         System.out.println("venueInstance.numSeatsAvailable(): " + venueInstance.numSeatsAvailable());
     }
 
-    private static void printStatement3(String threadName) {
+    private synchronized static void printStatement3(String threadName) {
         System.out.println("-----------" + threadName + "----seat queues seem empty..\n");
     }
 
