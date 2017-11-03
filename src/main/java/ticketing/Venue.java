@@ -3,6 +3,7 @@ package ticketing;
 
 import java.util.Map;
 import java.util.concurrent.*;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 
@@ -13,25 +14,24 @@ public class Venue implements TicketService {
     private static final int EXPIRE_MAX = 3000;
 
     //see 1.
-    private static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<String>> mapOfWaitLists = new ConcurrentHashMap<>();
-    //keys = customer name; value is seat they reserved.
-    private static ConcurrentHashMap<String, String> mapOfReservedSeats = new ConcurrentHashMap<>();
+    private static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Seat>> mapOfWaitLists = new ConcurrentHashMap<>();
+    //keys = customer name/email; value is seat they reserved. (later will be seatHold object)
+    private static ConcurrentHashMap<String, Seat> mapOfReservedSeats = new ConcurrentHashMap<>();
 
     //thread factory naming
     private static ThreadFactory threadFactory = new ThreadFactoryBuilder()
-            .setNameFormat("Customer-%d")
+            .setNameFormat("Customer_%d_@gmail.com")
             .setDaemon(true)
             .build();
 
 
+    private static Seat holdSeat() {
+        Seat seat = null; // return value
 
-    private static String holdSeat() {
-        String seat = null; // return value
-
-        for (Map.Entry<Integer, ConcurrentLinkedQueue<String>> entry : mapOfWaitLists.entrySet()) {  // look in each wait list for the first used
+        for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfWaitLists.entrySet()) {  // look in each wait list for the first used
             //get key, value for each entry
             Integer key = entry.getKey();
-            ConcurrentLinkedQueue<String> waitingListValue = entry.getValue();
+            ConcurrentLinkedQueue<Seat> waitingListValue = entry.getValue();
 
             //get top seat; if possible
             seat = waitingListValue.poll();
@@ -43,7 +43,7 @@ public class Venue implements TicketService {
     //this will be executed inside the run method of the threads that will be imitating customers using this service
     private static void imitateCustomer() {
         //each thread is like a person. should hold a seat
-        String seat = Venue.holdSeat();
+        Seat seat = Venue.holdSeat();
         System.out.println(Thread.currentThread().getName() + " got hold of seat: " + seat);
         String msg = "Map after " + seat + " held by " + Thread.currentThread().getName() + "\n";
         System.out.println("***" + msg + mapOfWaitLists + "\n***");
@@ -62,32 +62,44 @@ public class Venue implements TicketService {
         int reserveOrNot = ThreadLocalRandom.current().nextInt(0, 2);
         if (reserveOrNot == 0) {
             //reserve
+            Venue.reserve(seat);
             System.out.println("please reserve this seat: " + seat);
         } else {
             //put back
+            Venue.holdExpired(seat);
             System.out.println("please put this seat back into its queue: " + seat);
         }
 
 
     }
 
+    //i dont think synchronized is needed here, cuz
+    private static void holdExpired(Seat seat) {
+        System.out.println(seat + " is being put back...(priority:" + seat.getPriority()+ ")");
+        mapOfWaitLists.get(seat.getPriority()).add(seat);
+    }
+
+    private static void reserve(Seat seat) {
+        System.out.println(seat + " is being reserved...");
+    }
+
+
     public static void main(String[] args) {
         //create a 2 waitlists. give them 5 seats each. each seat has priority. 5, 10. five is higher priority.
+        ConcurrentLinkedQueue<Seat> waitList_5 = new ConcurrentLinkedQueue<>();
+        waitList_5.add(new Seat(0,0, 5));
+        waitList_5.add(new Seat(0,1, 5));
+        waitList_5.add(new Seat(0,2, 5));
+        waitList_5.add(new Seat(0,3, 5));
+        waitList_5.add(new Seat(0,4, 5));
 
-        //seat = string for now. will later be x,y position.
-        ConcurrentLinkedQueue<String> waitList_5 = new ConcurrentLinkedQueue<>();
-        waitList_5.add("seat1");
-        waitList_5.add("seat2");
-        waitList_5.add("seat3");
-        waitList_5.add("seat4");
-        waitList_5.add("seat5");
+        ConcurrentLinkedQueue<Seat> waitList_10 = new ConcurrentLinkedQueue<>();
+        waitList_5.add(new Seat(0,0, 10));
+        waitList_5.add(new Seat(0,1, 10));
+        waitList_5.add(new Seat(0,2, 10));
+        waitList_5.add(new Seat(0,3, 10));
+        waitList_5.add(new Seat(0,4, 10));
 
-        ConcurrentLinkedQueue<String> waitList_10 = new ConcurrentLinkedQueue<>();
-        waitList_10.add("seat6");
-        waitList_10.add("seat7");
-        waitList_10.add("seat8");
-        waitList_10.add("seat9");
-        waitList_10.add("seat10");
 
         //put waitlists in hashmap
         mapOfWaitLists.put(5, waitList_5);
@@ -96,29 +108,14 @@ public class Venue implements TicketService {
 
 
         //create several threads that remove highest priority seat and put them back after a few seconds.
-        //create threads; with lambda functions.
-//        Thread t1 = new Thread(() -> Venue.imitateCustomer(), "bobby");
-//        Thread t2 = new Thread(() -> Venue.imitateCustomer(), "joe");
-//
-//        //start them
-//        t1.start();
-//        t2.start();
-//
-//        //wait for them to finish and then join them to the main thread
-//        try {
-//            t1.join();
-//            t2.join();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
         ExecutorService executor = Executors.newFixedThreadPool(5, threadFactory);//creating a pool of 5 threads
         for (int i = 0; i < 10; i++) {
-//            Runnable worker = new WorkerThread("" + i);
-            executor.execute(() -> Venue.imitateCustomer());//calling execute method of ExecutorService
+            //execute method takes in a runnable object
+            executor.execute(() -> Venue.imitateCustomer());
         }
         executor.shutdown();
-        while (!executor.isTerminated()) {   }
-
+        while (!executor.isTerminated()) {
+        }
 
 
         //show map after both threads finish
@@ -139,6 +136,46 @@ public class Venue implements TicketService {
 
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // 1.  Should use a concurrent hashmap then an arraylist; if out of 10 priorities, we are only using 2, then hashmap will only have 2 keys.
