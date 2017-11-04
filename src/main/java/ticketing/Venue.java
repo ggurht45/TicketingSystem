@@ -53,8 +53,9 @@ public class Venue implements TicketService {
 
     //helper print method 2
     private synchronized static void printStatement2_staticVars() {
-        System.out.println("mapOfSeatQueues: " + mapOfSeatQueues);
-        System.out.println("mapOfReservedSeats: " + mapOfReservedSeats);
+        //comment out for now... pretty print later.
+//        System.out.println("mapOfSeatQueues: " + mapOfSeatQueues);
+//        System.out.println("mapOfReservedSeats: " + mapOfReservedSeats);
         System.out.println("NUM_OF_SEATS_HELD: " + NUM_OF_SEATS_HELD.get());
         System.out.println("NUM_OF_SEATS_RESERVED: " + NUM_OF_SEATS_RESERVED.get());
         System.out.println("venueInstance.numSeatsAvailable(): " + venueInstance.numSeatsAvailable());
@@ -192,6 +193,10 @@ public class Venue implements TicketService {
             priority = row / 2 + 1;                 //priorities are between 1-9
             for (int col = 0; col < COL_LIMIT; col++) {
                 s = new Seat(row, col, priority);
+                //columns on the edges are high value
+                if (col == 0 || col == COL_LIMIT - 1) {
+                    s.setPriority(1);
+                }
                 queue.add(s);
             }
             mapOfSeatQueues.put(priority, queue);
@@ -203,9 +208,9 @@ public class Venue implements TicketService {
         populateMap();                  //populate map with queues of seats arranged by priority
 
         //Initial printout
-        System.out.println("--------------initial vars:");
-        printStatement2_staticVars();
-        System.out.println("----------------------------\n");
+//        System.out.println("--------------initial vars:");
+//        printStatement2_staticVars();
+//        System.out.println("----------------------------\n");
 
         //create thread pool to represent customers buying tickets
         ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS, threadFactory);
@@ -217,8 +222,11 @@ public class Venue implements TicketService {
 
             //if all the seats have been reserved, then stop program
             if (venueInstance.numSeatsAvailable() == 0 && NUM_OF_SEATS_HELD.get() == 0) {
+
                 System.out.println("\n--------------final vars:");      //final printing of variables
                 printStatement2_staticVars();
+
+                //shutdown executor
                 executor.shutdown();
                 break;
             }

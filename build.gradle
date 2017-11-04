@@ -2,7 +2,7 @@ group 'WalmartLabs'
 version '1.0-SNAPSHOT'
 
 apply plugin: 'application'
-mainClassName = "Main"
+mainClassName = "ticketing.Venue"
 
 sourceCompatibility = 1.8
 

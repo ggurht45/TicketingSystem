@@ -63,10 +63,10 @@ set CMD_LINE_ARGS=%*
 :execute
 @rem Setup the command line
 
-set CLASSPATH=%APP_HOME%\lib\TicketingSystem-1.0-SNAPSHOT.jar
+set CLASSPATH=%APP_HOME%\lib\TicketingSystem-1.0-SNAPSHOT.jar;%APP_HOME%\lib\guava-11.0.2.jar;%APP_HOME%\lib\jsr305-1.3.9.jar;%APP_HOME%\lib\joda-time-2.2.jar
 
 @rem Execute TicketingSystem
-"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %TICKETING_SYSTEM_OPTS%  -classpath "%CLASSPATH%" Main %CMD_LINE_ARGS%
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %TICKETING_SYSTEM_OPTS%  -classpath "%CLASSPATH%" ticketing.Venue %CMD_LINE_ARGS%
 
 :end
 @rem End local scope for the variables with windows NT shell
