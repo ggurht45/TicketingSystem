@@ -40,6 +40,60 @@ public class Venue implements TicketService {
     //map of reserved seats. keys = hashcode of SeatHold obj; values = seatHold objects
     private static ConcurrentHashMap<Integer, SeatHold> mapOfReservedSeats = new ConcurrentHashMap<>();
 
+    //------------------------------------------------------------------------------------------------------------------------------ Variables above
+    //------------------------------------------------------------------------------------------------------------------------------ Methods below
+
+    //helper print method 1
+    private synchronized static void printStatement1(SeatHold sh, String email, String msg) {
+        System.out.println("-----------" + email + "----" + msg);
+        System.out.println(sh);
+        printStatement2_staticVars();
+        System.out.println("End-----------" + email + "\n");
+    }
+
+    //helper print method 2
+    private synchronized static void printStatement2_staticVars() {
+        System.out.println("mapOfSeatQueues: " + mapOfSeatQueues);
+        System.out.println("mapOfReservedSeats: " + mapOfReservedSeats);
+        System.out.println("NUM_OF_SEATS_HELD: " + NUM_OF_SEATS_HELD.get());
+        System.out.println("NUM_OF_SEATS_RESERVED: " + NUM_OF_SEATS_RESERVED.get());
+        System.out.println("venueInstance.numSeatsAvailable(): " + venueInstance.numSeatsAvailable());
+    }
+
+    //this is a "run" method to be executed inside threads which will represent customers interacting with the Venue class
+    private static void imitateCustomer() {
+        //the number of seats this customer requires
+        int numSeatsToHold = ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
+        String customerEmail = Thread.currentThread().getName();        //customer email address (also used as threads' naming format)
+
+        //call the findAndHoldSeats on an instance of this class
+        SeatHold seatHold = venueInstance.findAndHoldSeats(numSeatsToHold, customerEmail);
+
+        //show printout of which seats were held; these should be the best available seats under current circumstances.
+        printStatement1(seatHold, customerEmail, "Seats Held");
+
+        //then go to sleep for a few seconds. (to imitate customer contemplating seat choices)
+        try {
+            int timeSecs = ThreadLocalRandom.current().nextInt(EXPIRE_MIN, EXPIRE_MAX + 1);
+            System.out.println(customerEmail + " thread sleeping for " + (timeSecs / 1000.0) + "secs\n");
+            Thread.sleep(timeSecs);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        //decide if to return the seats or reserve it.
+        int reserveOrNot = ThreadLocalRandom.current().nextInt(0, 2);       //pick 0 or 1 randomly
+        if (reserveOrNot == 0) {
+            //dont reserve seats
+            Venue.expireHold(seatHold.getSeatsBeingHeld());
+            printStatement1(seatHold, customerEmail, "Seats Hold Expired");
+        } else {
+            //reserve seats
+            int seatHoldId = Venue.saveToReservationMap(seatHold);
+            venueInstance.reserveSeats(seatHoldId, seatHold.getCustomerEmail());
+            printStatement1(seatHold, customerEmail, "Seats Will be Reserved");
+        }
+    }
 
     //this method returns a seatHold object containing number of seats requests or slightly less depending on seat
     //availabilities. It goes through the map of seat queues in order of seat priorities and builds a seatHold object.
@@ -84,55 +138,6 @@ public class Venue implements TicketService {
         return seatHold;
     }
 
-
-    //helper print method 1
-    private synchronized static void printStatement1(SeatHold sh, String email, String msg) {
-        System.out.println("-----------" + email + "----" + msg);
-        System.out.println(sh);
-        printStatement2_staticVars();
-        System.out.println("End-----------" + email + "\n");
-    }
-
-    //helper print method 2
-    private synchronized static void printStatement2_staticVars() {
-        System.out.println("mapOfSeatQueues: " + mapOfSeatQueues);
-        System.out.println("mapOfReservedSeats: " + mapOfReservedSeats);
-        System.out.println("NUM_OF_SEATS_HELD: " + NUM_OF_SEATS_HELD.get());
-        System.out.println("NUM_OF_SEATS_RESERVED: " + NUM_OF_SEATS_RESERVED.get());
-        System.out.println("venueInstance.numSeatsAvailable(): " + venueInstance.numSeatsAvailable());
-    }
-
-
-    //this will be executed inside the run method of the threads that will be imitating customers using this service
-    private static void imitateCustomer() {
-        //request for and hold a random number of seats, each customer.
-        int numSeatsToHold = ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
-        String customerEmail = Thread.currentThread().getName();
-
-        //each thread is like a person. should hold a seat
-        SeatHold seatHold = venueInstance.findAndHoldSeats(numSeatsToHold, customerEmail);
-        printStatement1(seatHold, customerEmail, "Seats Held");
-
-        //then go to sleep for a few seconds. (to imitate customer contemplating seat choices)
-        try {
-            int timeSecs = ThreadLocalRandom.current().nextInt(EXPIRE_MIN, EXPIRE_MAX + 1);
-            System.out.println(customerEmail + " thread sleeping for " + (timeSecs / 1000) + "\n");
-            Thread.sleep(timeSecs);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        //after wakes up, should decide if to return the seat or reserve it.
-        int reserveOrNot = ThreadLocalRandom.current().nextInt(0, 2);
-        if (reserveOrNot == 0) {
-            Venue.expireHold(seatHold.getSeatsBeingHeld());
-            printStatement1(seatHold, customerEmail, "Seats Hold Expired");
-        } else {
-            int seatHoldId = Venue.saveToReservationMap(seatHold);
-            venueInstance.reserveSeats(seatHoldId, seatHold.getCustomerEmail());
-            printStatement1(seatHold, customerEmail, "Seats Hold Reserved");
-        }
-    }
 
     //Hold expired on these seats. Add them back into the map.
     private synchronized static void expireHold(ConcurrentLinkedQueue<Seat> seats) {
