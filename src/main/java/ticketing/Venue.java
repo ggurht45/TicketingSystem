@@ -1,6 +1,5 @@
 package ticketing;
 
-
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,42 +41,47 @@ public class Venue implements TicketService {
     private static ConcurrentHashMap<Integer, SeatHold> mapOfReservedSeats = new ConcurrentHashMap<>();
 
 
-    //see 2.
+    //this method returns a seatHold object containing number of seats requests or slightly less depending on seat
+    //availabilities. It goes through the map of seat queues in order of seat priorities and builds a seatHold object.
     private synchronized static SeatHold holdSeats(int numSeats, String customerEmail) {
+        //queue to hold seats you need
         ConcurrentLinkedQueue<Seat> seatsBeingHeld = new ConcurrentLinkedQueue<>();
 
-        //keep the original number in arg. decrement this variable
+        //create a variable to check off how many seats have yet to be found; numSeatsToHold will decrement as seats are found
         int numSeatsToHold = numSeats;
 
+        //go through map of seat queues
         Seat seat = null;
-        for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfSeatQueues.entrySet()) {  // look in each wait list for the first used
-            //get key, value for each entry
-            Integer key = entry.getKey();
-            ConcurrentLinkedQueue<Seat> waitingListValue = entry.getValue();
+        for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfSeatQueues.entrySet()) {
+            //get key, value for each entry in map
+            Integer key = entry.getKey();               //will be an integer representing priority level (1-9 for example)
+            ConcurrentLinkedQueue<Seat> seatQueue = entry.getValue();       //queue of seats at a certain priority
 
             //peek top seat
-            seat = waitingListValue.peek();
+            seat = seatQueue.peek();
 
-            //while current list is not empty, and still need more seats
-            //then, collect the seat that was polled, and update counter and seat variable
+            //collect seats
             while (seat != null && numSeatsToHold > 0) {
-                seat = waitingListValue.poll(); //pop seat
-                seatsBeingHeld.add(seat);
-                numSeatsToHold--;
-                NUM_OF_SEATS_HELD.incrementAndGet();
-                seat = waitingListValue.peek(); //peek next seat
+                seat = seatQueue.poll();            //pop seat
+                seatsBeingHeld.add(seat);           //collect seat
+                numSeatsToHold--;                   //decrement the count of needed seats
+                NUM_OF_SEATS_HELD.incrementAndGet();    //increase static var that shows how many total seats are being held
+                seat = seatQueue.peek();            //peek next seat
             }
 
-            //if all the seats have been collected, then return them.
+            //return SeatHold object if found all the seats you were looking for
             if (numSeatsToHold == 0) {
                 SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, numSeats);
                 return seatHold;
             }
         }
+
+        //return however many seats you managed to collect to the customer.
         int numberOfSeatsFound = numSeats - numSeatsToHold;
         SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, numberOfSeatsFound);
+        //print info
         printStatement1(seatHold, customerEmail, "customer only found " + numberOfSeatsFound + " out of " + numSeats);
-        return seatHold; // no seats found
+        return seatHold;
     }
 
 
@@ -104,7 +108,6 @@ public class Venue implements TicketService {
         //request for and hold a random number of seats, each customer.
         int numSeatsToHold = ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
         String customerEmail = Thread.currentThread().getName();
-
 
         //each thread is like a person. should hold a seat
         SeatHold seatHold = venueInstance.findAndHoldSeats(numSeatsToHold, customerEmail);
