@@ -1,6 +1,6 @@
 # TicketingSystem
 
-##Assumptions:
+## Assumptions:
  * Seats closer to the stage are of higher value;
  * Integers are used to represent the priorities of seating;
  * Low integers mean a higher value seat. Seat with level 1 is better than seat with level 5;
@@ -40,14 +40,14 @@
 ## Output Description
 Venue implements the TicketService and employs a threadpool to demonstrate how the methods would be used. The output printed to the console will look something like:
  
-`
------------Customer_5_@gmail.com----Seats Hold Expired
-SeatHold{seatsBeingHeld=[(16,4)-9], customerEmail='Custome
-NUM_OF_SEATS_HELD: 53
-NUM_OF_SEATS_RESERVED: 486
-venueInstance.numSeatsAvailable(): 1
-End-----------Customer_5_@gmail.com
-`
+
+    -----------Customer_5_@gmail.com----Seats Hold Expired
+    SeatHold{seatsBeingHeld=[(16,4)-9], customerEmail='Custome
+    NUM_OF_SEATS_HELD: 53
+    NUM_OF_SEATS_RESERVED: 486
+    venueInstance.numSeatsAvailable(): 1
+    End-----------Customer_5_@gmail.com
+
 
 
 In the beginning of the program, `NUM_OF_SEATS_HELD` and `NUM_OF_SEATS_RESERVED` are 0 and `venueInstance.numSeatsAvailable()` has all the seats. As the program runs, the number of seats being held by customers should increase; eventually the number of seats reserved increases also until at the end of the program execution, all of the seats should have been reserved. 
