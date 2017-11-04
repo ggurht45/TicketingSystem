@@ -3,9 +3,6 @@ import org.junit.rules.TestRule;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.Description;
 
-/**
- * Created by jahangir on 10/29/2017.
- */
 public class TestRules {
 
     @BeforeClass

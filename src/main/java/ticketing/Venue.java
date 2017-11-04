@@ -9,42 +9,42 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class Venue implements TicketService {
 
-    private static Venue venueInstance = new Venue();             //instance of this class, which implements TicketService
-    private static final int MAX_THREADS = 15;                    //max number of customer threads
+    protected static Venue venueInstance = new Venue();             //instance of this class, which implements TicketService
+    protected static int MAX_THREADS = 15;                    //max number of customer threads
 
     //thread factory naming convention; email format with number
-    private static ThreadFactory threadFactory = new ThreadFactoryBuilder()
+    protected static ThreadFactory threadFactory = new ThreadFactoryBuilder()
             .setNameFormat("Customer_%d_@gmail.com")
             .setDaemon(true)
             .build();
 
     //for seating layout
-    private static final int ROW_LIMIT = 18;
-    private static final int COL_LIMIT = 30;
-    private static final int TOTAL_SEATS = ROW_LIMIT * COL_LIMIT;    //total number of seats
+    protected static  int ROW_LIMIT = 18;
+    protected static  int COL_LIMIT = 30;
+    protected static  int TOTAL_SEATS = ROW_LIMIT * COL_LIMIT;    //total number of seats
 
     //sleeping times in miliseconds for customer threads's hold expiration
-    private static final int EXPIRE_MIN = 1000;
-    private static final int EXPIRE_MAX = 3000;
+    protected static  int EXPIRE_MIN = 1000;
+    protected static  int EXPIRE_MAX = 3000;
 
     //min, and max number of seats a customer can request
-    private static final int MIN_SEATS = 1;
-    private static final int MAX_SEATS = 20;
+    protected static  int MIN_SEATS = 1;
+    protected static  int MAX_SEATS = 20;
 
     //atomic variables keeping track of held and reserved seats
-    private static AtomicInteger NUM_OF_SEATS_HELD = new AtomicInteger();
-    private static AtomicInteger NUM_OF_SEATS_RESERVED = new AtomicInteger();
+    protected static AtomicInteger NUM_OF_SEATS_HELD = new AtomicInteger();
+    protected static AtomicInteger NUM_OF_SEATS_RESERVED = new AtomicInteger();
 
     //map of all the available seats; arranged in queues by priority of seats. low number = higher priority.
-    private static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Seat>> mapOfSeatQueues = new ConcurrentHashMap<>();
+    protected static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Seat>> mapOfSeatQueues = new ConcurrentHashMap<>();
     //map of reserved seats. keys = hashcode of SeatHold obj; values = seatHold objects
-    private static ConcurrentHashMap<Integer, SeatHold> mapOfReservedSeats = new ConcurrentHashMap<>();
+    protected static ConcurrentHashMap<Integer, SeatHold> mapOfReservedSeats = new ConcurrentHashMap<>();
 
     //------------------------------------------------------------------------------------------------------------------------------ Variables above
     //------------------------------------------------------------------------------------------------------------------------------ Methods below
 
     //helper print method 1
-    private synchronized static void printStatement1(SeatHold sh, String email, String msg) {
+    protected synchronized static void printStatement1(SeatHold sh, String email, String msg) {
         System.out.println("-----------" + email + "----" + msg);
         System.out.println(sh);
         printStatement2_staticVars();
@@ -52,7 +52,7 @@ public class Venue implements TicketService {
     }
 
     //helper print method 2
-    private synchronized static void printStatement2_staticVars() {
+    protected synchronized static void printStatement2_staticVars() {
         //comment out for now... pretty print later.
 //        System.out.println("mapOfSeatQueues: " + mapOfSeatQueues);
 //        System.out.println("mapOfReservedSeats: " + mapOfReservedSeats);
@@ -63,7 +63,7 @@ public class Venue implements TicketService {
     }
 
     //this is a "run" method to be executed inside threads which will represent customers interacting with the Venue class
-    private static void imitateCustomer() {
+    protected static void imitateCustomer() {
         //the number of seats this customer requires
         int numSeatsToHold = ThreadLocalRandom.current().nextInt(MIN_SEATS, MAX_SEATS + 1);
         String customerEmail = Thread.currentThread().getName();        //customer email address (also used as threads' naming format)
@@ -99,7 +99,7 @@ public class Venue implements TicketService {
 
     //this method returns a seatHold object containing number of seats requests or slightly less depending on seat
     //availabilities. It goes through the map of seat queues in order of seat priorities and builds a seatHold object.
-    private synchronized static SeatHold holdSeats(int numSeats, String customerEmail) {
+    protected synchronized static SeatHold holdSeats(int numSeats, String customerEmail) {
         //queue to hold seats you need
         ConcurrentLinkedQueue<Seat> seatsBeingHeld = new ConcurrentLinkedQueue<>();
 
@@ -142,7 +142,7 @@ public class Venue implements TicketService {
 
 
     //Hold expired on these seats. Add them back into the map.
-    private synchronized static void expireHold(ConcurrentLinkedQueue<Seat> seats) {
+    protected synchronized static void expireHold(ConcurrentLinkedQueue<Seat> seats) {
         for (Seat seat : seats) {
             NUM_OF_SEATS_HELD.decrementAndGet();                //decrement counter
             mapOfSeatQueues.get(seat.getPriority()).add(seat);
@@ -150,7 +150,7 @@ public class Venue implements TicketService {
     }
 
     //Add these seats to the map of reserved seats...
-    private static int saveToReservationMap(SeatHold seatHold) {
+    protected static int saveToReservationMap(SeatHold seatHold) {
         int hash = seatHold.getSeatsBeingHeld().hashCode();
         seatHold.setHashId(hash);
         mapOfReservedSeats.put(hash, seatHold);
@@ -161,7 +161,7 @@ public class Venue implements TicketService {
     }
 
 
-    private static void populateMap() {
+    protected static void populateMap() {
         //using this layout of Venue: lower numbers means better seats (closer to the stage)
         /** 18x30 grid. example
          1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
@@ -239,7 +239,7 @@ public class Venue implements TicketService {
         return TOTAL_SEATS - (NUM_OF_SEATS_HELD.get() + NUM_OF_SEATS_RESERVED.get());
     }
 
-    //uses a helper private static method
+    //uses a helper protected static method
     public SeatHold findAndHoldSeats(int numSeats, String customerEmail) {
         return Venue.holdSeats(numSeats, customerEmail);
     }
