@@ -20,3 +20,10 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
 
 }
+
+test {
+    //we want display the following test events
+    testLogging {
+        events "PASSED", "STARTED", "FAILED", "SKIPPED"
+    }
+}

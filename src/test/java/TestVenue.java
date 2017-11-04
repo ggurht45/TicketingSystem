@@ -1,13 +1,16 @@
-package ticketing;
 
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.junit.Test;
+import ticketing.Seat;
+import ticketing.SeatHold;
+import ticketing.Venue;
 
 
-public class Venue implements TicketService {
+public class TestVenue extends Venue {
 
     protected static Venue venueInstance = new Venue();             //instance of this class, which implements TicketService
     protected static int MAX_THREADS = 15;                    //max number of customer threads
@@ -106,6 +109,8 @@ public class Venue implements TicketService {
         //create a variable to check off how many seats have yet to be found; numSeatsToHold will decrement as seats are found
         int numSeatsToHold = numSeats;
 
+        System.out.println("printing this: " + mapOfSeatQueues.get(1));
+
         //go through map of seat queues
         Seat seat = null;
         for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfSeatQueues.entrySet()) {
@@ -136,7 +141,7 @@ public class Venue implements TicketService {
         int numberOfSeatsFound = numSeats - numSeatsToHold;
         SeatHold seatHold = new SeatHold(seatsBeingHeld, customerEmail, numberOfSeatsFound);
         //print info
-        printStatement1(seatHold, customerEmail, "customer only found +++" + numberOfSeatsFound + " out of " + numSeats);
+        printStatement1(seatHold, customerEmail, "customer only found*** " + numberOfSeatsFound + " out of " + numSeats);
         return seatHold;
     }
 
@@ -205,6 +210,7 @@ public class Venue implements TicketService {
     }
 
 
+
     public static void main(String[] args) {
         populateMap();                  //populate map with queues of seats arranged by priority
 
@@ -235,16 +241,19 @@ public class Venue implements TicketService {
     }
 
     //implementation of the public methods as specified in the TicketService interface
+    @Override
     public int numSeatsAvailable() {
         return TOTAL_SEATS - (NUM_OF_SEATS_HELD.get() + NUM_OF_SEATS_RESERVED.get());
     }
 
     //uses a helper protected static method
+    @Override
     public SeatHold findAndHoldSeats(int numSeats, String customerEmail) {
         return Venue.holdSeats(numSeats, customerEmail);
     }
 
     //seats should already have been stored in the reservation map, thats why we have seatHoldID,
+    @Override
     public String reserveSeats(int seatHoldId, String customerEmail) {
         //perform any other business logic here (as required for a reservation)
         String i = (new Integer(seatHoldId)).toString();        //convert seatHold ID to string
