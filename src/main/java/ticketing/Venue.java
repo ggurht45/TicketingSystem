@@ -10,8 +10,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class Venue implements TicketService {
 
-    private static Venue venueInstance;             //instance of this class, which implements TicketService
-    private static final int MAX_THREADS = 15;       //max number of customer threads
+    private static Venue venueInstance = new Venue();             //instance of this class, which implements TicketService
+    private static final int MAX_THREADS = 15;                    //max number of customer threads
 
     //thread factory naming convention; email format with number
     private static ThreadFactory threadFactory = new ThreadFactoryBuilder()
@@ -81,6 +81,7 @@ public class Venue implements TicketService {
     }
 
 
+    //helper print method 1
     private synchronized static void printStatement1(SeatHold sh, String email, String msg) {
         System.out.println("-----------" + email + "----" + msg);
         System.out.println(sh);
@@ -88,16 +89,13 @@ public class Venue implements TicketService {
         System.out.println("End-----------" + email + "\n");
     }
 
+    //helper print method 2
     private synchronized static void printStatement2_staticVars() {
-        System.out.println(mapOfSeatQueues);
-        System.out.println(mapOfReservedSeats);
+        System.out.println("mapOfSeatQueues: " + mapOfSeatQueues);
+        System.out.println("mapOfReservedSeats: " + mapOfReservedSeats);
         System.out.println("NUM_OF_SEATS_HELD: " + NUM_OF_SEATS_HELD.get());
         System.out.println("NUM_OF_SEATS_RESERVED: " + NUM_OF_SEATS_RESERVED.get());
         System.out.println("venueInstance.numSeatsAvailable(): " + venueInstance.numSeatsAvailable());
-    }
-
-    private synchronized static void printStatement3(String threadName) {
-        System.out.println("-----------" + threadName + "----seat queues seem empty..\n");
     }
 
 
@@ -133,30 +131,27 @@ public class Venue implements TicketService {
         }
     }
 
-    //i dont think synchronized is needed here,.. now with queue rather than single seat, maybe we do.
-    //still dont think we need sync, cuz just adding to the q. multiple threads can do that to the unbounded q.
+    //Hold expired on these seats. Add them back into the map.
     private synchronized static void expireHold(ConcurrentLinkedQueue<Seat> seats) {
         for (Seat seat : seats) {
-            NUM_OF_SEATS_HELD.decrementAndGet();
+            NUM_OF_SEATS_HELD.decrementAndGet();                //decrement counter
             mapOfSeatQueues.get(seat.getPriority()).add(seat);
         }
     }
 
+    //Add these seats to the map of reserved seats...
     private static int saveToReservationMap(SeatHold seatHold) {
         int hash = seatHold.getSeatsBeingHeld().hashCode();
         seatHold.setHashId(hash);
         mapOfReservedSeats.put(hash, seatHold);
         int num = seatHold.getNumberOfSeats();
-        NUM_OF_SEATS_HELD.addAndGet(-num);  //remove from the held seats counter
-        NUM_OF_SEATS_RESERVED.addAndGet(num); //add to the reserved seats counter
+        NUM_OF_SEATS_HELD.addAndGet(-num);              //subtract from "held" counter
+        NUM_OF_SEATS_RESERVED.addAndGet(num);           //add to the reserved seats counter
         return hash;
     }
 
 
     private static void populateMap() {
-        //create a 2 waitlists. give them 5 seats each. each seat has priority. 5, 10. five is higher priority.
-
-
         //using this layout of Venue: lower numbers means better seats (closer to the stage)
         /** 18x30 grid. example
          1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
@@ -179,11 +174,14 @@ public class Venue implements TicketService {
          1 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 1
          */
 
+        //some temp variables
         int priority;
         Seat s;
         ConcurrentLinkedQueue<Seat> queue = new ConcurrentLinkedQueue<>();
+
+        //populate map
         for (int row = 0; row < ROW_LIMIT; row++) {
-            priority = row / 2 + 1; //1-9
+            priority = row / 2 + 1;                 //priorities are between 1-9
             for (int col = 0; col < COL_LIMIT; col++) {
                 s = new Seat(row, col, priority);
                 queue.add(s);
@@ -194,84 +192,46 @@ public class Venue implements TicketService {
 
 
     public static void main(String[] args) {
-        //create an instance of this class to be used in other places
-        venueInstance = new Venue();
+        populateMap();                  //populate map with queues of seats arranged by priority
 
-        populateMap();
-
-        //initial print
+        //Initial printout
         System.out.println("--------------initial vars:");
         printStatement2_staticVars();
         System.out.println("----------------------------\n");
 
+        //create thread pool to represent customers buying tickets
+        ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS, threadFactory);
 
-        //create several threads that remove highest priority seat and put them back after a few seconds.
-        ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS, threadFactory);//creating a pool of 5 threads
+        //keep running customer threads until stop conditions met.
         while (true) {
-            //execute method takes in a runnable object
+            //execute method takes in a lambda which references the "run" method for the thread
             executor.execute(() -> Venue.imitateCustomer());
+
+            //if all the seats have been reserved, then stop program
             if (venueInstance.numSeatsAvailable() == 0 && NUM_OF_SEATS_HELD.get() == 0) {
-                System.out.println("sa: " + venueInstance.numSeatsAvailable() + "sh: " + NUM_OF_SEATS_HELD.get());
+                System.out.println("\n--------------final vars:");      //final printing of variables
+                printStatement2_staticVars();
                 executor.shutdown();
                 break;
             }
-
         }
-
-//        while (!executor.isTerminated()) {
-//        }
-
-
-        //final print
-        System.out.println("\n--------------final vars:");
-        printStatement2_staticVars();
     }
 
+    //implementation of the public methods as specified in the TicketService interface
     public int numSeatsAvailable() {
         return TOTAL_SEATS - (NUM_OF_SEATS_HELD.get() + NUM_OF_SEATS_RESERVED.get());
     }
 
+    //uses a helper private static method
     public SeatHold findAndHoldSeats(int numSeats, String customerEmail) {
         return Venue.holdSeats(numSeats, customerEmail);
     }
 
+    //seats should already have been stored in the reservation map, thats why we have seatHoldID,
     public String reserveSeats(int seatHoldId, String customerEmail) {
-        //seats should already have been stored in the reservation map, thats why we have seatHoldID,
-        //perform any other business logic here
-        String i = (new Integer(seatHoldId)).toString();
-        return (i).concat(customerEmail.substring(0, 3));
+        //perform any other business logic here (as required for a reservation)
+        String i = (new Integer(seatHoldId)).toString();        //convert seatHold ID to string
+        return (i).concat(customerEmail.substring(0, 3));       //return alphaNumeric string as confirmation code
     }
 
 }
-
-
-//need a snap-shot class that takes a snapshot and saves everything in one instance. think more. all of the maps, and current things being held, reserved and printed out should be shown.
-
-
-// 1.  Should use a concurrent hashmap then an arraylist; if out of 10 priorities, we are only using 2, then hashmap will only have 2 keys.
-// also hashmap may be able to support different notions of priorities such as red class, blue class or green class (whatever they mean)
-// therefore its a more flexible solution without much of a overhead.
-// We will never really be adding or removing waitlists from the hashmap except in the intial set up when all the seats are put inside
-// the hashmap.
-//
-//can use the default constructor for the ConcurrentHashMap, which sets the initial capacity of the hashmap to be 16, and load fac .75, concur 16
-
-
-//2. think about numSeatsToHold, and synchronization, and multi threads.
-//just polling, maybe dont need to worry about sync. hm.. think later.
-//********this method collects all the seats in one go for one customer and then returns them.****
-//maybe could think of a method that satisfies many customers one seat at a time.
-// the customer could dynamically increase or decrease their seat requests.
-
-//********> before a thread gives up waiting to hold onto some elements, it should wait until no seats are being held.
-//in other words, if seats are being held currently, then the thread should not give up and say oh, no seats are available.
-//see producer consumer exmple.
-
-//----> customers = threads. customers who are currently holding seats are possible producers.
-//customers who are waiting to hold seats are possible consumers. ... hmm. maybe use BlockingQueue. sizes will be determined by initial read of data.
-
-
-//---> reason to not use blockingQ.
-//well we have more than one list. therefore, if one list is empty and it may really be empty, so we dont want to continuously wait on it.
-//
-
