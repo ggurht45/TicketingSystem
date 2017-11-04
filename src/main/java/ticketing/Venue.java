@@ -10,36 +10,37 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 public class Venue implements TicketService {
 
-    //instance of class
-    private static Venue venueInstance;
+    private static Venue venueInstance;             //instance of this class, which implements TicketService
+    private static final int MAX_THREADS = 15;       //max number of customer threads
 
-    //sleeping times in miliseconds
+    //thread factory naming convention; email format with number
+    private static ThreadFactory threadFactory = new ThreadFactoryBuilder()
+            .setNameFormat("Customer_%d_@gmail.com")
+            .setDaemon(true)
+            .build();
+
+    //for seating layout
+    private static final int ROW_LIMIT = 18;
+    private static final int COL_LIMIT = 30;
+    private static final int TOTAL_SEATS = ROW_LIMIT * COL_LIMIT;    //total number of seats
+
+    //sleeping times in miliseconds for customer threads's hold expiration
     private static final int EXPIRE_MIN = 1000;
     private static final int EXPIRE_MAX = 3000;
 
     //min, and max number of seats a customer can request
     private static final int MIN_SEATS = 1;
-    private static final int MAX_SEATS = 6;
+    private static final int MAX_SEATS = 20;
 
-    //total number of seats
-    private static AtomicInteger TOTAL_NUM_OF_SEATS = new AtomicInteger(10);
-
-    //counter for currently held seats
+    //atomic variables keeping track of held and reserved seats
     private static AtomicInteger NUM_OF_SEATS_HELD = new AtomicInteger();
-
-    //counter for currently reserved seats
     private static AtomicInteger NUM_OF_SEATS_RESERVED = new AtomicInteger();
 
-    //see 1.
-    private static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Seat>> mapOfWaitLists = new ConcurrentHashMap<>();
-    //keys = customer name/email; value is seat they reserved. (later will be seatHold object)
+    //map of all the available seats; arranged in queues by priority of seats. low number = higher priority.
+    private static ConcurrentHashMap<Integer, ConcurrentLinkedQueue<Seat>> mapOfSeatQueues = new ConcurrentHashMap<>();
+    //map of reserved seats. keys = hashcode of SeatHold obj; values = seatHold objects
     private static ConcurrentHashMap<Integer, SeatHold> mapOfReservedSeats = new ConcurrentHashMap<>();
 
-    //thread factory naming
-    private static ThreadFactory threadFactory = new ThreadFactoryBuilder()
-            .setNameFormat("Customer_%d_@gmail.com")
-            .setDaemon(true)
-            .build();
 
     //see 2.
     private synchronized static SeatHold holdSeats(int numSeats, String customerEmail) {
@@ -49,7 +50,7 @@ public class Venue implements TicketService {
         int numSeatsToHold = numSeats;
 
         Seat seat = null;
-        for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfWaitLists.entrySet()) {  // look in each wait list for the first used
+        for (Map.Entry<Integer, ConcurrentLinkedQueue<Seat>> entry : mapOfSeatQueues.entrySet()) {  // look in each wait list for the first used
             //get key, value for each entry
             Integer key = entry.getKey();
             ConcurrentLinkedQueue<Seat> waitingListValue = entry.getValue();
@@ -88,7 +89,7 @@ public class Venue implements TicketService {
     }
 
     private synchronized static void printStatement2_staticVars() {
-        System.out.println(mapOfWaitLists);
+        System.out.println(mapOfSeatQueues);
         System.out.println(mapOfReservedSeats);
         System.out.println("NUM_OF_SEATS_HELD: " + NUM_OF_SEATS_HELD.get());
         System.out.println("NUM_OF_SEATS_RESERVED: " + NUM_OF_SEATS_RESERVED.get());
@@ -137,7 +138,7 @@ public class Venue implements TicketService {
     private synchronized static void expireHold(ConcurrentLinkedQueue<Seat> seats) {
         for (Seat seat : seats) {
             NUM_OF_SEATS_HELD.decrementAndGet();
-            mapOfWaitLists.get(seat.getPriority()).add(seat);
+            mapOfSeatQueues.get(seat.getPriority()).add(seat);
         }
     }
 
@@ -152,32 +153,51 @@ public class Venue implements TicketService {
     }
 
 
+    private static void populateMap() {
+        //create a 2 waitlists. give them 5 seats each. each seat has priority. 5, 10. five is higher priority.
+
+
+        //using this layout of Venue: lower numbers means better seats (closer to the stage)
+        /** 18x30 grid. example
+         1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+         1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+         1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1
+         1 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 2 1
+         1 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 1
+         1 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 3 1
+         1 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 1
+         1 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 1
+         1 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 1
+         1 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 5 1
+         1 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 1
+         1 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 6 1
+         1 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 1
+         1 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 1
+         1 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 1
+         1 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 1
+         1 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 1
+         1 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 1
+         */
+
+        int priority;
+        Seat s;
+        ConcurrentLinkedQueue<Seat> queue = new ConcurrentLinkedQueue<>();
+        for (int row = 0; row < ROW_LIMIT; row++) {
+            priority = row / 2 + 1; //1-9
+            for (int col = 0; col < COL_LIMIT; col++) {
+                s = new Seat(row, col, priority);
+                queue.add(s);
+            }
+            mapOfSeatQueues.put(priority, queue);
+        }
+    }
+
+
     public static void main(String[] args) {
         //create an instance of this class to be used in other places
         venueInstance = new Venue();
 
-        //create a 2 waitlists. give them 5 seats each. each seat has priority. 5, 10. five is higher priority.
-        ConcurrentLinkedQueue<Seat> waitList_5 = new ConcurrentLinkedQueue<>();
-        waitList_5.add(new Seat(0, 0, 5));
-        waitList_5.add(new Seat(0, 1, 5));
-        waitList_5.add(new Seat(0, 2, 5));
-        waitList_5.add(new Seat(0, 3, 5));
-        waitList_5.add(new Seat(0, 4, 5));
-
-        ConcurrentLinkedQueue<Seat> waitList_10 = new ConcurrentLinkedQueue<>();
-        waitList_10.add(new Seat(1, 0, 10));
-        waitList_10.add(new Seat(1, 1, 10));
-        waitList_10.add(new Seat(1, 2, 10));
-        waitList_10.add(new Seat(1, 3, 10));
-        waitList_10.add(new Seat(1, 4, 10));
-
-        //set total num seats;
-        TOTAL_NUM_OF_SEATS.getAndSet(10);
-
-
-        //put waitlists in hashmap
-        mapOfWaitLists.put(5, waitList_5);
-        mapOfWaitLists.put(10, waitList_10);
+        populateMap();
 
         //initial print
         System.out.println("--------------initial vars:");
@@ -186,7 +206,7 @@ public class Venue implements TicketService {
 
 
         //create several threads that remove highest priority seat and put them back after a few seconds.
-        ExecutorService executor = Executors.newFixedThreadPool(5, threadFactory);//creating a pool of 5 threads
+        ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS, threadFactory);//creating a pool of 5 threads
         while (true) {
             //execute method takes in a runnable object
             executor.execute(() -> Venue.imitateCustomer());
@@ -208,7 +228,7 @@ public class Venue implements TicketService {
     }
 
     public int numSeatsAvailable() {
-        return TOTAL_NUM_OF_SEATS.get() - (NUM_OF_SEATS_HELD.get() + NUM_OF_SEATS_RESERVED.get());
+        return TOTAL_SEATS - (NUM_OF_SEATS_HELD.get() + NUM_OF_SEATS_RESERVED.get());
     }
 
     public SeatHold findAndHoldSeats(int numSeats, String customerEmail) {
