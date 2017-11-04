@@ -56,6 +56,7 @@ public class Venue implements TicketService {
         //comment out for now... pretty print later.
 //        System.out.println("mapOfSeatQueues: " + mapOfSeatQueues);
 //        System.out.println("mapOfReservedSeats: " + mapOfReservedSeats);
+
         System.out.println("NUM_OF_SEATS_HELD: " + NUM_OF_SEATS_HELD.get());
         System.out.println("NUM_OF_SEATS_RESERVED: " + NUM_OF_SEATS_RESERVED.get());
         System.out.println("venueInstance.numSeatsAvailable(): " + venueInstance.numSeatsAvailable());
