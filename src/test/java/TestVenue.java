@@ -167,6 +167,7 @@ public class TestVenue extends Venue {
 
 
     protected static void populateMap() {
+//        System.out.println("hello from populateMap");
         //using this layout of Venue: lower numbers means better seats (closer to the stage)
         /** 18x30 grid. example
          1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
